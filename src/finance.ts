@@ -75,8 +75,24 @@ export function computeRetirementProjection(inputs: RetirementInputs): Retiremen
   }
 }
 
-export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: number): number {
+export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: number): {
+  successRate: number
+  monthlyPercentiles: {
+    month: number
+    age: number
+    p10: number
+    p50: number
+    p90: number
+  }[]
+} {
+  const monthlyResults: number[][] = []
   let successfulRuns = 0
+  
+  // Initialize monthly results array
+  const totalMonths = (inputs.lifespan - inputs.currentAge) * 12
+  for (let month = 0; month < totalMonths; month++) {
+    monthlyResults[month] = []
+  }
   
   for (let i = 0; i < iterations; i++) {
     // Add random variation to returns (±2% standard deviation)
@@ -100,6 +116,13 @@ export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: nu
     
     const projection = computeRetirementProjection(adjustedInputs)
     
+    // Store monthly results
+    projection.monthlyProjections.forEach((monthly, monthIndex) => {
+      if (monthIndex < totalMonths) {
+        monthlyResults[monthIndex].push(monthly.balance)
+      }
+    })
+    
     // Check if retirement was successful (didn't run out of money)
     const lastBalance = projection.monthlyProjections[projection.monthlyProjections.length - 1]?.balance || 0
     if (lastBalance > 0) {
@@ -107,7 +130,28 @@ export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: nu
     }
   }
   
-  return (successfulRuns / iterations) * 100
+  // Calculate percentiles for each month
+  const monthlyPercentiles = monthlyResults.map((monthBalances, monthIndex) => {
+    const sortedBalances = monthBalances.sort((a, b) => a - b)
+    const p10Index = Math.floor(monthBalances.length * 0.1)
+    const p50Index = Math.floor(monthBalances.length * 0.5)
+    const p90Index = Math.floor(monthBalances.length * 0.9)
+    
+    const age = inputs.currentAge + monthIndex / 12
+    
+    return {
+      month: monthIndex,
+      age,
+      p10: sortedBalances[p10Index] || 0,
+      p50: sortedBalances[p50Index] || 0,
+      p90: sortedBalances[p90Index] || 0
+    }
+  })
+  
+  return {
+    successRate: (successfulRuns / iterations) * 100,
+    monthlyPercentiles
+  }
 }
 
 // Legacy functions for backward compatibility

@@ -156,7 +156,16 @@ function setupCurrencyMask(inputId: string): void {
   })
 }
 
-function drawChart(projections: MonthlyProjection[]): void {
+function drawChart(
+  projections: MonthlyProjection[], 
+  monteCarloResults?: {
+    month: number
+    age: number
+    p10: number
+    p50: number
+    p90: number
+  }[]
+): void {
   const canvas = getElementByIdOrThrow<HTMLCanvasElement>('projectionChart')
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -166,13 +175,15 @@ function drawChart(projections: MonthlyProjection[]): void {
 
   if (projections.length === 0) return
 
-  // Find min/max values for scaling
-  const values = projections.map(p => p.balance)
+  // Find min/max values for scaling (include Monte Carlo results if available)
+  let values = projections.map(p => p.balance)
+  if (monteCarloResults) {
+    const mcValues = monteCarloResults.flatMap(mc => [mc.p10, mc.p50, mc.p90])
+    values = [...values, ...mcValues]
+  }
   const minValue = Math.min(...values)
   const maxValue = Math.max(...values)
   const range = maxValue - minValue
-
-
 
   // Chart dimensions and margins
   const margin = Math.max(80, Math.max(
@@ -206,23 +217,58 @@ function drawChart(projections: MonthlyProjection[]): void {
   ctx.lineTo(canvas.width - margin, canvas.height - margin)
   ctx.stroke()
 
-  // Draw projection line with pleasant colors
-  ctx.strokeStyle = '#8b5cf6' // Purple
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  
-  projections.forEach((projection, index) => {
-    const x = margin + (index / (projections.length - 1)) * chartWidth
-    const y = canvas.height - margin - ((projection.balance - minValue) / range) * chartHeight
-    
-    if (index === 0) {
-      ctx.moveTo(x, y)
-    } else {
-      ctx.lineTo(x, y)
-    }
-  })
-  
-  ctx.stroke()
+  // Draw Monte Carlo percentile lines if available
+  if (monteCarloResults && monteCarloResults.length > 0) {
+    // Draw P90 line (blue) - conservative scenario
+    ctx.strokeStyle = '#3b82f6' // Blue
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    monteCarloResults.forEach((mc, index) => {
+      const x = margin + (index / (monteCarloResults.length - 1)) * chartWidth
+      const y = canvas.height - margin - ((mc.p90 - minValue) / range) * chartHeight
+      
+      if (index === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
+    })
+    ctx.stroke()
+
+    // Draw P50 line (green) - median scenario
+    ctx.strokeStyle = '#10b981' // Green
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    monteCarloResults.forEach((mc, index) => {
+      const x = margin + (index / (monteCarloResults.length - 1)) * chartWidth
+      const y = canvas.height - margin - ((mc.p50 - minValue) / range) * chartHeight
+      
+      if (index === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
+    })
+    ctx.stroke()
+
+    // Draw P10 line (red) - optimistic scenario
+    ctx.strokeStyle = '#ef4444' // Red
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    monteCarloResults.forEach((mc, index) => {
+      const x = margin + (index / (monteCarloResults.length - 1)) * chartWidth
+      const y = canvas.height - margin - ((mc.p10 - minValue) / range) * chartHeight
+      
+      if (index === 0) {
+        ctx.moveTo(x, y)
+      } else {
+        ctx.lineTo(x, y)
+      }
+    })
+    ctx.stroke()
+  }
+
+
 
   // Draw retirement line with better styling
   const retirementIndex = projections.findIndex(p => p.isRetirement)
@@ -282,31 +328,69 @@ function drawChart(projections: MonthlyProjection[]): void {
   ctx.textAlign = 'center'
   ctx.fillText('Portfolio Balance Over Time', canvas.width / 2, margin / 2)
 
-  // Add legend above the chart
-  const legendY = margin - 20
+  // Add legend to the right side of the chart
+  const legendStartX = canvas.width - margin - 120
+  const legendY = margin + 20
   ctx.font = '12px Arial'
   ctx.textAlign = 'left'
+  const legendSpacing = 25
   
-  // Portfolio line legend
-  ctx.strokeStyle = '#8b5cf6'
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(margin, legendY)
-  ctx.lineTo(margin + 30, legendY)
-  ctx.stroke()
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
-  ctx.fillText('Portfolio Balance', margin + 40, legendY + 4)
-  
-  // Retirement line legend
-  ctx.strokeStyle = '#ef4444'
-  ctx.lineWidth = 3
-  ctx.setLineDash([8, 4])
-  ctx.beginPath()
-  ctx.moveTo(margin + 200, legendY)
-  ctx.lineTo(margin + 230, legendY)
-  ctx.stroke()
-  ctx.setLineDash([])
-  ctx.fillText('Retirement Start', margin + 240, legendY + 4)
+  // Monte Carlo legends if available
+  if (monteCarloResults && monteCarloResults.length > 0) {
+    // P90 legend (blue)
+    ctx.strokeStyle = '#3b82f6'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(legendStartX, legendY)
+    ctx.lineTo(legendStartX + 30, legendY)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.fillText('P90 (Conservative)', legendStartX + 40, legendY + 4)
+    
+    // P50 legend (green) - renamed to Portfolio Balance
+    ctx.strokeStyle = '#10b981'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(legendStartX, legendY - legendSpacing)
+    ctx.lineTo(legendStartX + 30, legendY - legendSpacing)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.fillText('Portfolio Balance', legendStartX + 40, legendY - legendSpacing + 4)
+    
+    // P10 legend (red)
+    ctx.strokeStyle = '#ef4444'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(legendStartX, legendY - legendSpacing * 2)
+    ctx.lineTo(legendStartX + 30, legendY - legendSpacing * 2)
+    ctx.stroke()
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.fillText('P10 (Optimistic)', legendStartX + 40, legendY - legendSpacing * 2 + 4)
+    
+    // Retirement line legend
+    ctx.strokeStyle = '#ef4444'
+    ctx.lineWidth = 3
+    ctx.setLineDash([8, 4])
+    ctx.beginPath()
+    ctx.moveTo(legendStartX, legendY - legendSpacing * 3)
+    ctx.lineTo(legendStartX + 30, legendY - legendSpacing * 3)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.fillText('Retirement Start', legendStartX + 40, legendY - legendSpacing * 3 + 4)
+  } else {
+    // Retirement line legend (original position)
+    ctx.strokeStyle = '#ef4444'
+    ctx.lineWidth = 3
+    ctx.setLineDash([8, 4])
+    ctx.beginPath()
+    ctx.moveTo(legendStartX, legendY)
+    ctx.lineTo(legendStartX + 30, legendY)
+    ctx.stroke()
+    ctx.setLineDash([])
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+    ctx.fillText('Retirement Start', legendStartX + 40, legendY + 4)
+  }
 
   // Add X-axis label (removed "Years")
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
@@ -316,7 +400,16 @@ function drawChart(projections: MonthlyProjection[]): void {
 }
 
 // Add hover functionality to show values
-function setupChartHover(projections: MonthlyProjection[]): void {
+function setupChartHover(
+  projections: MonthlyProjection[],
+  monteCarloResults?: {
+    month: number
+    age: number
+    p10: number
+    p50: number
+    p90: number
+  }[]
+): void {
   const canvas = getElementByIdOrThrow<HTMLCanvasElement>('projectionChart')
   
   // Remove any existing tooltip
@@ -346,13 +439,13 @@ function setupChartHover(projections: MonthlyProjection[]): void {
   // Chart dimensions for coordinate conversion
   const margin = 80
   const chartWidth = canvas.width - margin * 2
-  const chartHeight = canvas.height - margin * 2
   
-  // Get data range for Y-axis scaling
-  const values = projections.map(p => p.balance)
-  const minValue = Math.min(...values)
-  const maxValue = Math.max(...values)
-  const valueRange = maxValue - minValue
+  // Get data range for Y-axis scaling (not used in hover, but kept for potential future use)
+  let values = projections.map(p => p.balance)
+  if (monteCarloResults) {
+    const mcValues = monteCarloResults.flatMap(mc => [mc.p10, mc.p50, mc.p90])
+    values = [...values, ...mcValues]
+  }
   
   canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect()
@@ -369,11 +462,22 @@ function setupChartHover(projections: MonthlyProjection[]): void {
       const projection = projections[Math.max(0, Math.min(projectionIndex, projections.length - 1))]
       
       if (projection) {
-        tooltip.innerHTML = `
+        let tooltipContent = `
           <strong>Age: ${Math.round(projection.age)}</strong><br>
           <strong>Balance: $${abbreviateNumber(projection.balance)}</strong><br>
           <em>${projection.isRetirement ? 'Retirement' : 'Accumulation'}</em>
         `
+        
+        // Add Monte Carlo percentile information if available
+        if (monteCarloResults && monteCarloResults[projectionIndex]) {
+          const mc = monteCarloResults[projectionIndex]
+          tooltipContent += `<br><br><strong>Monte Carlo Scenarios:</strong><br>`
+          tooltipContent += `<span style="color: #3b82f6;">P90: $${abbreviateNumber(mc.p90)}</span><br>`
+          tooltipContent += `<span style="color: #10b981;">Portfolio Balance: $${abbreviateNumber(mc.p50)}</span><br>`
+          tooltipContent += `<span style="color: #ef4444;">P10: $${abbreviateNumber(mc.p10)}</span>`
+        }
+        
+        tooltip.innerHTML = tooltipContent
         
         tooltip.style.display = 'block'
         tooltip.style.left = (e.clientX + 10) + 'px'
@@ -416,15 +520,15 @@ function recalc(): void {
   const projection = computeRetirementProjection(inputs)
   
   // Run Monte Carlo simulation
-  const successRate = runMonteCarloSimulation(inputs, 1000)
+  const simulationResults = runMonteCarloSimulation(inputs, 1000)
   
   // Update success probability
   const successFill = getElementByIdOrThrow<HTMLDivElement>('successFill')
   const successText = getElementByIdOrThrow<HTMLSpanElement>('successText')
   
-  successFill.style.width = `${successRate}%`
-  successFill.style.backgroundColor = successRate >= 80 ? '#10b981' : successRate >= 60 ? '#f59e0b' : '#ef4444'
-  successText.textContent = `${successRate.toFixed(1)}% success probability`
+  successFill.style.width = `${simulationResults.successRate}%`
+  successFill.style.backgroundColor = simulationResults.successRate >= 80 ? '#10b981' : simulationResults.successRate >= 60 ? '#f59e0b' : '#ef4444'
+  successText.textContent = `${simulationResults.successRate.toFixed(1)}% success probability`
   
   // Update key metrics
   getElementByIdOrThrow<HTMLSpanElement>('nestEgg').textContent = formatNumber(projection.nestEgg)
@@ -451,9 +555,9 @@ function recalc(): void {
     getElementByIdOrThrow<HTMLSpanElement>('ageAt4Percent').textContent = `${ageAt4Percent} ($${formatNumber(targetBalance)})`
   }
   
-  // Draw chart
-  drawChart(projection.monthlyProjections)
-  setupChartHover(projection.monthlyProjections)
+  // Draw chart with Monte Carlo results
+  drawChart(projection.monthlyProjections, simulationResults.monthlyPercentiles)
+  setupChartHover(projection.monthlyProjections, simulationResults.monthlyPercentiles)
 }
 
 const form = getElementByIdOrThrow<HTMLFormElement>('inputs')
