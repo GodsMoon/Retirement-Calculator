@@ -72,16 +72,20 @@ appRoot.innerHTML = `
       
       <div class="key-metrics">
         <div class="metric">
-          <span>Nest Egg at Retirement</span>
-          <strong id="nestEgg"></strong>
+          <span class="label">Nest Egg at Retirement</span>
+          <span id="nestEgg" class="value">0</span>
         </div>
         <div class="metric">
-          <span>Monthly Withdrawal (today's dollars)</span>
-          <strong id="monthlyWithdrawal"></strong>
+          <span class="label">Monthly Withdrawal (today's dollars)</span>
+          <span id="monthlyWithdrawal" class="value">0</span>
         </div>
         <div class="metric">
-          <span>Years of Retirement</span>
-          <strong id="retirementYears"></strong>
+          <span class="label">Years of Retirement</span>
+          <span id="retirementYears" class="value">0</span>
+        </div>
+        <div class="metric">
+          <span class="label">Age at 4% Safe Withdrawal</span>
+          <span id="ageAt4Percent" class="value">0</span>
         </div>
       </div>
     </div>
@@ -384,6 +388,26 @@ function recalc(): void {
   getElementByIdOrThrow<HTMLSpanElement>('nestEgg').textContent = formatNumber(projection.nestEgg)
   getElementByIdOrThrow<HTMLSpanElement>('monthlyWithdrawal').textContent = formatNumber(projection.monthlyWithdrawal)
   getElementByIdOrThrow<HTMLSpanElement>('retirementYears').textContent = (inputs.lifespan - inputs.retirementAge).toString()
+  
+  // Calculate age at 4% safe withdrawal
+  const targetBalance = inputs.retirementSpending * 25 // 4% rule: 25x annual spending
+  let ageAt4Percent = inputs.currentAge
+  
+  // Find the first month where balance reaches target for 4% withdrawal
+  for (let i = 0; i < projection.monthlyProjections.length; i++) {
+    if (projection.monthlyProjections[i].balance >= targetBalance) {
+      ageAt4Percent = Math.round(projection.monthlyProjections[i].age)
+      break
+    }
+  }
+  
+  // If never reached, show "Never" or a very high age
+  if (ageAt4Percent === inputs.currentAge) {
+    getElementByIdOrThrow<HTMLSpanElement>('ageAt4Percent').textContent = 'Never'
+  } else {
+    const targetBalance = inputs.retirementSpending * 25
+    getElementByIdOrThrow<HTMLSpanElement>('ageAt4Percent').textContent = `${ageAt4Percent} ($${formatNumber(targetBalance)})`
+  }
   
   // Draw chart
   drawChart(projection.monthlyProjections)
