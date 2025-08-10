@@ -7,6 +7,7 @@ export type RetirementInputs = {
   annualReturn: number
   annualInflation: number
   retirementSpending: number
+  flexibleSpending: boolean
 }
 
 export type MonthlyProjection = {
@@ -30,8 +31,8 @@ export function computeRetirementProjection(inputs: RetirementInputs): Retiremen
     currentSavings, 
     annualContributions, 
     annualReturn, 
-    annualInflation, 
-    retirementSpending 
+    retirementSpending,
+    flexibleSpending
   } = inputs
 
   const totalMonths = (lifespan - currentAge) * 12
@@ -40,7 +41,7 @@ export function computeRetirementProjection(inputs: RetirementInputs): Retiremen
   let currentBalance = currentSavings
   const monthlyContribution = annualContributions / 12
   const monthlyReturn = annualReturn / 100 / 12
-  const monthlyInflation = annualInflation / 100 / 12
+  const monthlyInflation = inputs.annualInflation / 100 / 12
 
   // Calculate accumulation phase
   for (let month = 0; month < totalMonths; month++) {
@@ -50,7 +51,13 @@ export function computeRetirementProjection(inputs: RetirementInputs): Retiremen
     if (isRetirement) {
       // Retirement phase - withdraw and adjust for inflation
       const inflationAdjustedSpending = retirementSpending * Math.pow(1 + monthlyInflation, month)
-      const monthlyWithdrawal = inflationAdjustedSpending / 12
+      let monthlyWithdrawal = inflationAdjustedSpending / 12
+      
+      // Apply flexible spending logic during market drawdowns
+      if (flexibleSpending && monthlyReturn < 0) {
+        monthlyWithdrawal *= 0.75 // Reduce spending by 25% during negative returns
+      }
+      
       currentBalance = currentBalance * (1 + monthlyReturn) - monthlyWithdrawal
     } else {
       // Accumulation phase - contribute and grow

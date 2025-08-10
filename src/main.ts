@@ -47,7 +47,13 @@ appRoot.innerHTML = `
       
       <label>
         <span>Annual Return Assumption (%)</span>
-        <input id="annualReturn" type="number" step="0.1" min="0" max="20" value="15" />
+        <div class="input-with-buttons">
+          <input id="annualReturn" type="number" step="0.1" min="0" max="20" value="15" />
+          <div class="button-group">
+            <button type="button" id="sp500Button" class="historical-button">S&P 500 (10.4%)</button>
+            <button type="button" id="nasdaq100Button" class="historical-button">NASDAQ-100 (16%)</button>
+          </div>
+        </div>
       </label>
       
       <label>
@@ -58,6 +64,11 @@ appRoot.innerHTML = `
       <label>
         <span>Desired Annual Retirement Spending (today's dollars)</span>
         <input id="retirementSpending" type="text" value="$180,000" />
+      </label>
+      
+      <label class="checkbox-label">
+        <input id="flexibleSpending" type="checkbox" />
+        <span>Enable flexible spending (reduce spending by 25% during market drawdowns)</span>
       </label>
     </form>
     
@@ -99,8 +110,13 @@ appRoot.innerHTML = `
 
 function readNumber(id: string): number {
   const element = getElementByIdOrThrow<HTMLInputElement>(id)
-  const value = element.value.replace(/[$,]/g, '') // Remove $ and commas for currency inputs
+  const value = element.value.replace(/[$,]/g, '')
   return parseFloat(value) || 0
+}
+
+function readCheckbox(id: string): boolean {
+  const element = getElementByIdOrThrow<HTMLInputElement>(id)
+  return element.checked
 }
 
 function formatNumber(value: number): string {
@@ -502,7 +518,8 @@ function recalc(): void {
     annualContributions: readNumber('annualContributions'),
     annualReturn: readNumber('annualReturn'),
     annualInflation: readNumber('annualInflation'),
-    retirementSpending: readNumber('retirementSpending')
+    retirementSpending: readNumber('retirementSpending'),
+    flexibleSpending: readCheckbox('flexibleSpending')
   }
 
   // Validate inputs
@@ -562,6 +579,23 @@ function recalc(): void {
 
 const form = getElementByIdOrThrow<HTMLFormElement>('inputs')
 form.addEventListener('input', recalc)
+
+// Setup historical return buttons
+const sp500Button = getElementByIdOrThrow<HTMLButtonElement>('sp500Button')
+const nasdaq100Button = getElementByIdOrThrow<HTMLButtonElement>('nasdaq100Button')
+
+sp500Button.addEventListener('click', () => {
+  const annualReturnInput = getElementByIdOrThrow<HTMLInputElement>('annualReturn')
+  annualReturnInput.value = '10.4'
+  recalc()
+})
+
+nasdaq100Button.addEventListener('click', () => {
+  const annualReturnInput = getElementByIdOrThrow<HTMLInputElement>('annualReturn')
+  annualReturnInput.value = '16'
+  recalc()
+})
+
 recalc()
 
 // Setup currency masks for dollar inputs

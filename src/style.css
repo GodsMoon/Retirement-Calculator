@@ -61,6 +61,64 @@ label {
   color: var(--muted);
 }
 
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+  background-color: #10b981;
+  border-color: #10b981;
+}
+
+.checkbox-label span {
+  order: 2;
+  cursor: pointer;
+}
+
+.input-with-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.historical-button {
+  background-color: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.historical-button:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+.historical-button:active {
+  background-color: #d1d5db;
+  transform: translateY(1px);
+}
+
 input, select {
   appearance: none;
   background: var(--panel);
