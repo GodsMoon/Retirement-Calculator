@@ -87,9 +87,11 @@ export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: nu
   monthlyPercentiles: {
     month: number
     age: number
+    p5: number
     p10: number
     p50: number
     p90: number
+    p95: number
   }[]
 } {
   const monthlyResults: number[][] = []
@@ -140,18 +142,22 @@ export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: nu
   // Calculate percentiles for each month
   const monthlyPercentiles = monthlyResults.map((monthBalances, monthIndex) => {
     const sortedBalances = monthBalances.sort((a, b) => a - b)
+    const p5Index = Math.floor(monthBalances.length * 0.05)
     const p10Index = Math.floor(monthBalances.length * 0.1)
     const p50Index = Math.floor(monthBalances.length * 0.5)
     const p90Index = Math.floor(monthBalances.length * 0.9)
+    const p95Index = Math.floor(monthBalances.length * 0.95)
     
     const age = inputs.currentAge + monthIndex / 12
     
     return {
       month: monthIndex,
       age,
+      p5: sortedBalances[p5Index] || 0,
       p10: sortedBalances[p10Index] || 0,
       p50: sortedBalances[p50Index] || 0,
-      p90: sortedBalances[p90Index] || 0
+      p90: sortedBalances[p90Index] || 0,
+      p95: sortedBalances[p95Index] || 0
     }
   })
   

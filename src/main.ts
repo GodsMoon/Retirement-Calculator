@@ -1,7 +1,8 @@
 import './style.css'
 import { 
   computeRetirementProjection, 
-  runMonteCarloSimulation
+  runMonteCarloSimulation,
+  formatCurrency
 } from './finance'
 import type { 
   RetirementInputs,
@@ -104,6 +105,26 @@ appRoot.innerHTML = `
     <div class="chart-container">
       <h3>Monthly Accumulation Projections</h3>
       <canvas id="projectionChart" width="800" height="400"></canvas>
+    </div>
+    
+    <!-- Monte Carlo Results Table -->
+    <div id="monteCarloTable" class="results-table">
+      <h3>Monte Carlo Simulation Results by Age</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Age</th>
+            <th>Very Conservative (P5)</th>
+            <th>Conservative (P10)</th>
+            <th>Average Balance (P50)</th>
+            <th>Optimistic (P90)</th>
+            <th>Very Optimistic (P95)</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <!-- Table rows will be populated by JavaScript -->
+        </tbody>
+      </table>
     </div>
   </div>
 `
@@ -342,7 +363,7 @@ function drawChart(
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
   ctx.font = 'bold 16px Arial'
   ctx.textAlign = 'center'
-  ctx.fillText('Portfolio Balance Over Time', canvas.width / 2, margin / 2)
+      ctx.fillText('Average Balance Over Time', canvas.width / 2, margin / 2)
 
   // Add legend to the right side of the chart
   const legendStartX = canvas.width - margin - 120
@@ -363,7 +384,7 @@ function drawChart(
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
     ctx.fillText('P90 (Conservative)', legendStartX + 40, legendY + 4)
     
-    // P50 legend (green) - renamed to Portfolio Balance
+    // P50 legend (green) - renamed to Average Balance
     ctx.strokeStyle = '#10b981'
     ctx.lineWidth = 2
     ctx.beginPath()
@@ -371,7 +392,7 @@ function drawChart(
     ctx.lineTo(legendStartX + 30, legendY - legendSpacing)
     ctx.stroke()
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
-    ctx.fillText('Portfolio Balance', legendStartX + 40, legendY - legendSpacing + 4)
+    ctx.fillText('Average Balance', legendStartX + 40, legendY - legendSpacing + 4)
     
     // P10 legend (red)
     ctx.strokeStyle = '#ef4444'
@@ -489,7 +510,7 @@ function setupChartHover(
           const mc = monteCarloResults[projectionIndex]
           tooltipContent += `<br><br><strong>Monte Carlo Scenarios:</strong><br>`
           tooltipContent += `<span style="color: #3b82f6;">P90: $${abbreviateNumber(mc.p90)}</span><br>`
-          tooltipContent += `<span style="color: #10b981;">Portfolio Balance: $${abbreviateNumber(mc.p50)}</span><br>`
+          tooltipContent += `<span style="color: #10b981;">Average Balance: $${abbreviateNumber(mc.p50)}</span><br>`
           tooltipContent += `<span style="color: #ef4444;">P10: $${abbreviateNumber(mc.p10)}</span>`
         }
         
@@ -506,6 +527,100 @@ function setupChartHover(
   
   canvas.addEventListener('mouseleave', () => {
     tooltip.style.display = 'none'
+  })
+}
+
+function populateMonteCarloTable(monthlyPercentiles: any[]) {
+  const tableBody = document.getElementById('tableBody')
+  if (!tableBody) return
+  
+  // Clear existing rows
+  tableBody.innerHTML = ''
+  
+  // Get retirement spending for 4% rule calculation
+  const retirementSpending = readNumber('retirementSpending')
+  const targetBalance = retirementSpending * 25 // 4% rule: 25x annual spending
+  
+  // Track when each scenario first reaches 4% safe withdrawal
+  let firstReachedP5 = -1
+  let firstReachedP10 = -1
+  let firstReachedP50 = -1
+  let firstReachedP90 = -1
+  let firstReachedP95 = -1
+  
+  // Find first occurrence for each scenario
+  monthlyPercentiles.forEach((monthData, monthIndex) => {
+    if (firstReachedP5 === -1 && monthData.p5 >= targetBalance) {
+      firstReachedP5 = monthIndex
+    }
+    if (firstReachedP10 === -1 && monthData.p10 >= targetBalance) {
+      firstReachedP10 = monthIndex
+    }
+    if (firstReachedP50 === -1 && monthData.p50 >= targetBalance) {
+      firstReachedP50 = monthIndex
+    }
+    if (firstReachedP90 === -1 && monthData.p90 >= targetBalance) {
+      firstReachedP90 = monthIndex
+    }
+    if (firstReachedP95 === -1 && monthData.p95 >= targetBalance) {
+      firstReachedP95 = monthIndex
+    }
+  })
+  
+  // Group data by year (age) and show one row per year
+  const yearlyData = new Map()
+  
+  monthlyPercentiles.forEach(monthData => {
+    const year = Math.floor(monthData.age)
+    if (!yearlyData.has(year)) {
+      yearlyData.set(year, {
+        age: year,
+        p5: monthData.p5, // Very Conservative (P5)
+        p10: monthData.p10, // Conservative (P10)
+        p50: monthData.p50, // Average Balance (P50)
+        p90: monthData.p90, // Optimistic (P90)
+        p95: monthData.p95 // Very Optimistic (P95)
+      })
+    }
+  })
+  
+  // Sort by age and create table rows
+  const sortedYears = Array.from(yearlyData.values()).sort((a, b) => a.age - b.age)
+  
+  // Helper function to check if a year should be highlighted for a given percentile
+  const shouldHighlight = (year: number, firstReachedMonthIndex: number) => {
+    if (firstReachedMonthIndex === -1) return false
+    
+    // Get the age at the month when target was first reached
+    const targetReachedAge = monthlyPercentiles[firstReachedMonthIndex]?.age
+    if (targetReachedAge === undefined) return false
+    
+    // Get the year (floor of age) when target was first reached
+    const targetReachedYear = Math.floor(targetReachedAge)
+    
+    // Highlight the year that matches the target reached year
+    return year === targetReachedYear
+  }
+  
+  sortedYears.forEach(yearData => {
+    const row = document.createElement('tr')
+    
+    // Create cells with highlighting for 4% safe withdrawal
+    const p5Cell = `<td class="${shouldHighlight(yearData.age, firstReachedP5) ? 'highlight-4percent' : ''}">${formatCurrency(yearData.p5)}</td>`
+    const p10Cell = `<td class="${shouldHighlight(yearData.age, firstReachedP10) ? 'highlight-4percent' : ''}">${formatCurrency(yearData.p10)}</td>`
+    const p50Cell = `<td class="${shouldHighlight(yearData.age, firstReachedP50) ? 'highlight-4percent' : ''}">${formatCurrency(yearData.p50)}</td>`
+    const p90Cell = `<td class="${shouldHighlight(yearData.age, firstReachedP90) ? 'highlight-4percent' : ''}">${formatCurrency(yearData.p90)}</td>`
+    const p95Cell = `<td class="${shouldHighlight(yearData.age, firstReachedP95) ? 'highlight-4percent' : ''}">${formatCurrency(yearData.p95)}</td>`
+    
+    row.innerHTML = `
+      <td>${yearData.age}</td>
+      ${p5Cell}
+      ${p10Cell}
+      ${p50Cell}
+      ${p90Cell}
+      ${p95Cell}
+    `
+    tableBody.appendChild(row)
   })
 }
 
@@ -575,6 +690,7 @@ function recalc(): void {
   // Draw chart with Monte Carlo results
   drawChart(projection.monthlyProjections, simulationResults.monthlyPercentiles)
   setupChartHover(projection.monthlyProjections, simulationResults.monthlyPercentiles)
+  populateMonteCarloTable(simulationResults.monthlyPercentiles)
 }
 
 const form = getElementByIdOrThrow<HTMLFormElement>('inputs')
