@@ -1,3 +1,116 @@
+export type RetirementInputs = {
+  currentAge: number
+  retirementAge: number
+  lifespan: number
+  currentSavings: number
+  annualContributions: number
+  annualReturn: number
+  annualInflation: number
+  retirementSpending: number
+}
+
+export type MonthlyProjection = {
+  month: number
+  age: number
+  balance: number
+  isRetirement: boolean
+}
+
+export type RetirementProjection = {
+  nestEgg: number
+  monthlyWithdrawal: number
+  monthlyProjections: MonthlyProjection[]
+}
+
+export function computeRetirementProjection(inputs: RetirementInputs): RetirementProjection {
+  const { 
+    currentAge, 
+    retirementAge, 
+    lifespan, 
+    currentSavings, 
+    annualContributions, 
+    annualReturn, 
+    annualInflation, 
+    retirementSpending 
+  } = inputs
+
+  const totalMonths = (lifespan - currentAge) * 12
+  
+  const monthlyProjections: MonthlyProjection[] = []
+  let currentBalance = currentSavings
+  const monthlyContribution = annualContributions / 12
+  const monthlyReturn = annualReturn / 100 / 12
+  const monthlyInflation = annualInflation / 100 / 12
+
+  // Calculate accumulation phase
+  for (let month = 0; month < totalMonths; month++) {
+    const age = currentAge + month / 12
+    const isRetirement = age >= retirementAge
+    
+    if (isRetirement) {
+      // Retirement phase - withdraw and adjust for inflation
+      const inflationAdjustedSpending = retirementSpending * Math.pow(1 + monthlyInflation, month)
+      const monthlyWithdrawal = inflationAdjustedSpending / 12
+      currentBalance = currentBalance * (1 + monthlyReturn) - monthlyWithdrawal
+    } else {
+      // Accumulation phase - contribute and grow
+      currentBalance = currentBalance * (1 + monthlyReturn) + monthlyContribution
+    }
+    
+    monthlyProjections.push({
+      month,
+      age,
+      balance: Math.max(0, currentBalance),
+      isRetirement
+    })
+  }
+
+  const nestEgg = monthlyProjections.find(p => p.age >= retirementAge)?.balance || 0
+  const monthlyWithdrawal = retirementSpending / 12
+
+  return {
+    nestEgg,
+    monthlyWithdrawal,
+    monthlyProjections
+  }
+}
+
+export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: number): number {
+  let successfulRuns = 0
+  
+  for (let i = 0; i < iterations; i++) {
+    // Add random variation to returns (±2% standard deviation)
+    const returnVariation = (Math.random() - 0.5) * 4 // ±2% range
+    const adjustedReturn = inputs.annualReturn + returnVariation
+    
+    // Add random variation to inflation (±1% standard deviation)
+    const inflationVariation = (Math.random() - 0.5) * 2 // ±1% range
+    const adjustedInflation = inputs.annualInflation + inflationVariation
+    
+    // Add random variation to lifespan (±5 years)
+    const lifespanVariation = (Math.random() - 0.5) * 10 // ±5 years
+    const adjustedLifespan = inputs.lifespan + lifespanVariation
+    
+    const adjustedInputs = {
+      ...inputs,
+      annualReturn: Math.max(0, adjustedReturn),
+      annualInflation: Math.max(0, adjustedInflation),
+      lifespan: Math.max(inputs.retirementAge + 10, adjustedLifespan)
+    }
+    
+    const projection = computeRetirementProjection(adjustedInputs)
+    
+    // Check if retirement was successful (didn't run out of money)
+    const lastBalance = projection.monthlyProjections[projection.monthlyProjections.length - 1]?.balance || 0
+    if (lastBalance > 0) {
+      successfulRuns++
+    }
+  }
+  
+  return (successfulRuns / iterations) * 100
+}
+
+// Legacy functions for backward compatibility
 export type FutureValueInputs = {
   currentSavings: number
   monthlyContribution: number
