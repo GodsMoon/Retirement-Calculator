@@ -598,8 +598,8 @@ function populateMonteCarloTable(monthlyPercentiles: any[]) {
     // Get the year (floor of age) when target was first reached
     const targetReachedYear = Math.floor(targetReachedAge)
     
-    // Highlight the year that matches the target reached year
-    return year === targetReachedYear
+    // Highlight the year AFTER the target was first reached (shift by +1 year)
+    return year === targetReachedYear + 1
   }
   
   sortedYears.forEach(yearData => {
