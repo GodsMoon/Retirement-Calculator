@@ -37,12 +37,12 @@ appRoot.innerHTML = `
       
       <label>
         <span>Current Savings Balance</span>
-        <input id="currentSavings" type="number" min="0" step="1000" value="1200000" />
+        <input id="currentSavings" type="text" value="$1,200,000" />
       </label>
       
       <label>
         <span>Annual Contributions</span>
-        <input id="annualContributions" type="number" min="0" step="1000" value="12000" />
+        <input id="annualContributions" type="text" value="$12,000" />
       </label>
       
       <label>
@@ -57,7 +57,7 @@ appRoot.innerHTML = `
       
       <label>
         <span>Desired Annual Retirement Spending (today's dollars)</span>
-        <input id="retirementSpending" type="number" min="0" step="1000" value="180000" />
+        <input id="retirementSpending" type="text" value="$180,000" />
       </label>
     </form>
     
@@ -98,9 +98,9 @@ appRoot.innerHTML = `
 `
 
 function readNumber(id: string): number {
-  const input = getElementByIdOrThrow<HTMLInputElement>(id)
-  const value = Number(input.value)
-  return isFinite(value) ? value : 0
+  const element = getElementByIdOrThrow<HTMLInputElement>(id)
+  const value = element.value.replace(/[$,]/g, '') // Remove $ and commas for currency inputs
+  return parseFloat(value) || 0
 }
 
 function formatNumber(value: number): string {
@@ -112,6 +112,48 @@ function abbreviateNumber(num: number): string {
   if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M'
   if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K'
   return num.toString()
+}
+
+// Currency mask function for input fields
+function setupCurrencyMask(inputId: string): void {
+  const input = getElementByIdOrThrow<HTMLInputElement>(inputId)
+  
+  input.addEventListener('input', (e) => {
+    const target = e.target as HTMLInputElement
+    let value = target.value.replace(/[^\d]/g, '') // Remove non-digits
+    
+    if (value === '') {
+      target.value = ''
+      return
+    }
+    
+    // Convert to number and format
+    const numValue = parseInt(value, 10)
+    if (!isNaN(numValue)) {
+      target.value = '$' + formatNumber(numValue)
+    }
+  })
+  
+  // Handle focus - show raw number for editing
+  input.addEventListener('focus', (e) => {
+    const target = e.target as HTMLInputElement
+    const rawValue = target.value.replace(/[^\d]/g, '')
+    if (rawValue) {
+      target.value = rawValue
+    }
+  })
+  
+  // Handle blur - format as currency
+  input.addEventListener('blur', (e) => {
+    const target = e.target as HTMLInputElement
+    const rawValue = target.value.replace(/[^\d]/g, '')
+    if (rawValue) {
+      const numValue = parseInt(rawValue, 10)
+      if (!isNaN(numValue)) {
+        target.value = '$' + formatNumber(numValue)
+      }
+    }
+  })
 }
 
 function drawChart(projections: MonthlyProjection[]): void {
@@ -417,3 +459,8 @@ function recalc(): void {
 const form = getElementByIdOrThrow<HTMLFormElement>('inputs')
 form.addEventListener('input', recalc)
 recalc()
+
+// Setup currency masks for dollar inputs
+setupCurrencyMask('currentSavings')
+setupCurrencyMask('annualContributions')
+setupCurrencyMask('retirementSpending')
