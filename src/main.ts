@@ -38,7 +38,7 @@ appRoot.innerHTML = `
       
       <label>
         <span>Current Savings Balance</span>
-        <input id="currentSavings" type="text" value="$1,200,000" />
+        <input id="currentSavings" type="text" value="$300,000" />
       </label>
       
       <label>
@@ -49,7 +49,7 @@ appRoot.innerHTML = `
       <label>
         <span>Annual Return Assumption (%)</span>
         <div class="input-with-buttons">
-          <input id="annualReturn" type="number" step="0.1" min="0" max="20" value="15" />
+          <input id="annualReturn" type="number" step="0.1" min="0" max="20" value="10.4" />
           <div class="button-group">
             <button type="button" id="sp500Button" class="historical-button">S&P 500 (10.4%)</button>
             <button type="button" id="nasdaq100Button" class="historical-button">NASDAQ-100 (16%)</button>
@@ -64,7 +64,7 @@ appRoot.innerHTML = `
       
       <label>
         <span>Desired Annual Retirement Spending (today's dollars)</span>
-        <input id="retirementSpending" type="text" value="$180,000" />
+        <input id="retirementSpending" type="text" value="$150,000" />
       </label>
       
       <label class="checkbox-label">
