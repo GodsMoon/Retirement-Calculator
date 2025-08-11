@@ -104,8 +104,8 @@ export function runMonteCarloSimulation(inputs: RetirementInputs, iterations: nu
   }
   
   for (let i = 0; i < iterations; i++) {
-    // Add random variation to returns (±2% standard deviation)
-    const returnVariation = (Math.random() - 0.5) * 4 // ±2% range
+    // Add random variation to returns (±5% standard deviation)
+    const returnVariation = (Math.random() - 0.5) * 10 // ±5% range
     const adjustedReturn = inputs.annualReturn + returnVariation
     
     // Add random variation to inflation (±1% standard deviation)

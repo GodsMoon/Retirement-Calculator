@@ -19,6 +19,16 @@ const appRoot = document.querySelector<HTMLDivElement>('#app')!
 appRoot.innerHTML = `
   <div class="container">
     <h1>Retirement Calculator</h1>
+    <div class="profiles">
+      <div class="profile-buttons">
+        <button type="button" id="profile1" class="profile-button active" title="Baseline Aggressive">Baseline</button>
+        <button type="button" id="profile2" class="profile-button" title="Balanced Growth">Balanced</button>
+        <button type="button" id="profile3" class="profile-button" title="Starter Conservative">Starter</button>
+        <button type="button" id="profile4" class="profile-button" title="Comfortable Moderate">Comfort</button>
+        <button type="button" id="profile5" class="profile-button" title="Custom profile (Ctrl+5)">Custom</button>
+      </div>
+      <button type="button" id="saveCustomProfile" class="save-profile-button" title="Save current inputs to Custom">Save Custom</button>
+    </div>
     
     <form id="inputs" class="grid">
       <label>
@@ -49,7 +59,7 @@ appRoot.innerHTML = `
       <label>
         <span>Annual Return Assumption (%)</span>
         <div class="input-with-buttons">
-          <input id="annualReturn" type="number" step="0.1" min="0" max="20" value="10.4" />
+          <input id="annualReturn" type="number" step="0.1" min="0" max="100" value="10.4" />
           <div class="button-group">
             <button type="button" id="sp500Button" class="historical-button">S&P 500 (10.4%)</button>
             <button type="button" id="nasdaq100Button" class="historical-button">NASDAQ-100 (16%)</button>
@@ -157,6 +167,111 @@ function abbreviateNumber(num: number): string {
   if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M'
   if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K'
   return num.toString()
+}
+
+// Profiles
+type ProfileData = { savings: number; returnAssumption: number; spending: number }
+type CustomProfileData = {
+  currentAge: number
+  retirementAge: number
+  lifespan: number
+  currentSavings: number
+  annualContributions: number
+  annualReturn: number
+  annualInflation: number
+  retirementSpending: number
+  flexibleSpending: boolean
+}
+const CUSTOM_PROFILE_KEY = 'rc_custom_profile_v1'
+
+const predefinedProfiles: Record<number, { name: string; data: ProfileData }> = {
+  1: { name: 'Baseline', data: { savings: 300000, returnAssumption: 10.4, spending: 150000 } },
+  2: { name: 'Balanced', data: { savings: 500000, returnAssumption: 8, spending: 100000 } },
+  3: { name: 'Starter', data: { savings: 200000, returnAssumption: 7, spending: 80000 } },
+  4: { name: 'Comfort', data: { savings: 400000, returnAssumption: 9, spending: 120000 } }
+}
+
+function setCurrencyInput(id: string, amount: number): void {
+  const input = getElementByIdOrThrow<HTMLInputElement>(id)
+  input.value = '$' + formatNumber(amount)
+}
+
+function captureCurrentAsCustom(): CustomProfileData {
+  return {
+    currentAge: readNumber('currentAge'),
+    retirementAge: readNumber('retirementAge'),
+    lifespan: readNumber('lifespan'),
+    currentSavings: readNumber('currentSavings'),
+    annualContributions: readNumber('annualContributions'),
+    annualReturn: readNumber('annualReturn'),
+    annualInflation: readNumber('annualInflation'),
+    retirementSpending: readNumber('retirementSpending'),
+    flexibleSpending: readCheckbox('flexibleSpending')
+  }
+}
+
+function ensureCustomProfile(): CustomProfileData {
+  try {
+    const stored = localStorage.getItem(CUSTOM_PROFILE_KEY)
+    if (stored) return JSON.parse(stored) as CustomProfileData
+  } catch { /* ignore parse errors */ }
+  const fromDefaults = captureCurrentAsCustom()
+  try { localStorage.setItem(CUSTOM_PROFILE_KEY, JSON.stringify(fromDefaults)) } catch { /* ignore */ }
+  return fromDefaults
+}
+
+function applyProfileByIndex(index: number): void {
+  let profile: ProfileData | null = null
+  if (index >= 1 && index <= 4) {
+    profile = predefinedProfiles[index as 1 | 2 | 3 | 4].data
+  } else if (index === 5) {
+    try {
+      const stored = localStorage.getItem(CUSTOM_PROFILE_KEY)
+      const custom = stored ? JSON.parse(stored) as CustomProfileData : ensureCustomProfile()
+      if (custom) {
+        // Numbers
+        getElementByIdOrThrow<HTMLInputElement>('currentAge').value = String(custom.currentAge)
+        getElementByIdOrThrow<HTMLInputElement>('retirementAge').value = String(custom.retirementAge)
+        getElementByIdOrThrow<HTMLInputElement>('lifespan').value = String(custom.lifespan)
+        getElementByIdOrThrow<HTMLInputElement>('annualReturn').value = String(custom.annualReturn)
+        getElementByIdOrThrow<HTMLInputElement>('annualInflation').value = String(custom.annualInflation)
+        // Currency
+        setCurrencyInput('currentSavings', custom.currentSavings)
+        setCurrencyInput('annualContributions', custom.annualContributions)
+        setCurrencyInput('retirementSpending', custom.retirementSpending)
+        // Checkbox
+        getElementByIdOrThrow<HTMLInputElement>('flexibleSpending').checked = !!custom.flexibleSpending
+
+        updateActiveProfileButton(index)
+        recalc()
+        return
+      }
+      profile = null
+    } catch {
+      profile = null
+    }
+  }
+
+  if (profile) {
+    setCurrencyInput('currentSavings', profile.savings)
+    getElementByIdOrThrow<HTMLInputElement>('annualReturn').value = String(profile.returnAssumption)
+    setCurrencyInput('retirementSpending', profile.spending)
+    updateActiveProfileButton(index)
+    recalc()
+  } else if (index === 5) {
+    // No custom saved yet, mark active but keep current values
+    updateActiveProfileButton(index)
+  }
+}
+
+function updateActiveProfileButton(index: number): void {
+  for (let i = 1; i <= 5; i++) {
+    const btn = document.getElementById(`profile${i}`)
+    if (btn) {
+      if (i === index) btn.classList.add('active')
+      else btn.classList.remove('active')
+    }
+  }
 }
 
 // Currency mask function for input fields
@@ -726,3 +841,45 @@ recalc()
 setupCurrencyMask('currentSavings')
 setupCurrencyMask('annualContributions')
 setupCurrencyMask('retirementSpending')
+
+// Profile button event wiring
+for (let i = 1; i <= 5; i++) {
+  const btn = getElementByIdOrThrow<HTMLButtonElement>(`profile${i}`)
+  btn.addEventListener('click', () => applyProfileByIndex(i))
+}
+
+// Save custom profile (save ALL inputs)
+const saveCustomBtn = getElementByIdOrThrow<HTMLButtonElement>('saveCustomProfile')
+saveCustomBtn.addEventListener('click', () => {
+  const custom: CustomProfileData = {
+    currentAge: readNumber('currentAge'),
+    retirementAge: readNumber('retirementAge'),
+    lifespan: readNumber('lifespan'),
+    currentSavings: readNumber('currentSavings'),
+    annualContributions: readNumber('annualContributions'),
+    annualReturn: readNumber('annualReturn'),
+    annualInflation: readNumber('annualInflation'),
+    retirementSpending: readNumber('retirementSpending'),
+    flexibleSpending: readCheckbox('flexibleSpending')
+  }
+  try {
+    localStorage.setItem(CUSTOM_PROFILE_KEY, JSON.stringify(custom))
+    updateActiveProfileButton(5)
+  } catch {
+    // ignore storage errors
+  }
+})
+
+// Keyboard shortcuts Ctrl/Cmd + 1..5
+document.addEventListener('keydown', (e) => {
+  const isAccel = e.ctrlKey || e.metaKey
+  if (!isAccel) return
+  const key = e.key
+  if (/^[1-5]$/.test(key)) {
+    e.preventDefault()
+    applyProfileByIndex(parseInt(key, 10))
+  }
+})
+
+// Ensure custom profile exists on first load (uses current defaults)
+ensureCustomProfile()
