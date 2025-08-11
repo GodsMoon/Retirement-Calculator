@@ -125,8 +125,14 @@ appRoot.innerHTML = `
           <!-- Table rows will be populated by JavaScript -->
         </tbody>
       </table>
-    </div>
   </div>
+  </div>
+  <footer class="site-footer">
+    Created by David at 
+    <a href="https://github.com/GodsMoon/Retirement-Calculator" target="_blank" rel="noopener noreferrer">
+      github.com/GodsMoon/Retirement-Calculator
+    </a>
+  </footer>
 `
 
 function readNumber(id: string): number {

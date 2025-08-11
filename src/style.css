@@ -314,3 +314,20 @@ input:focus, select:focus {
     height: 300px;
   }
 }
+
+/* Footer */
+.site-footer {
+  margin: 24px 0 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.site-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
